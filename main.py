@@ -17,7 +17,7 @@ def ejecutar_experimento(idx, config):
         cromosoma_size=config["cromosoma_size"],
         tasa_cruce=config["tasa_cruce"],
         tasa_mutacion=config["tasa_mutacion"],
-        num_generaciones=10,
+        num_generaciones=500,
         operador_seleccion=Seleccion.torneo,
         operador_cruce=Cruce.un_punto,
         operador_mutacion=Mutacion.scramble,

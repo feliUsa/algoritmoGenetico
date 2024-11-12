@@ -4,6 +4,4 @@ from numba import njit
 @njit
 def fitness_func(cromosoma, maximize=True):
     fitness_value = np.sum(cromosoma)
-    if not maximize:
-        fitness_value *= -1
-    return fitness_value
+    return fitness_value if maximize else -fitness_value

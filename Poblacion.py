@@ -8,7 +8,7 @@ class Poblacion:
         self.fitness_func = fitness_func
 
     def calcular_fitness(self):
-        cromosomas = np.array([ind.cromosoma for ind in self.individuos])
+        cromosomas = np.array([ind.cromosoma for ind in self.individuos], dtype=np.bool_)
         fitness_values = calcular_fitness_poblacion(cromosomas)
 
         for i, individuo in enumerate(self.individuos):
@@ -25,7 +25,7 @@ class Poblacion:
 
 @njit(parallel=True)
 def calcular_fitness_poblacion(cromosomas):
-    fitness_values = np.zeros(cromosomas.shape[0])
+    fitness_values = np.zeros(cromosomas.shape[0], dtype=np.float64)
     for i in prange(cromosomas.shape[0]):
         fitness_values[i] = np.sum(cromosomas[i])
     return fitness_values

@@ -2,25 +2,39 @@ from algoritmoGenetico import AlgoritmoGenetico
 from Seleccion import Seleccion
 from Cruce import Cruce
 from Mutacion import Mutacion
+import concurrent.futures
 
-# Configuraciones de prueba
-genetico = AlgoritmoGenetico(
-    poblacion_size=1000,
-    cromosoma_size=1000000,
-    tasa_cruce=0.7,
-    tasa_mutacion=0.5,
-    num_generaciones=3000000,
-    operador_seleccion=Seleccion.torneo,
-    operador_cruce=Cruce.un_punto,
-    operador_mutacion=Mutacion.scramble,
-    tamano_elite=0.1,
-    maximize=True,
-    tolerancia_generaciones=10
-)
+experimentos = [
+    {"poblacion_size": 1000, "cromosoma_size": 100000, "tasa_cruce": 0.7, "tasa_mutacion": 0.5},
+    {"poblacion_size": 1000, "cromosoma_size": 100000, "tasa_cruce": 0.8, "tasa_mutacion": 0.3},
+    {"poblacion_size": 1000, "cromosoma_size": 100000, "tasa_cruce": 0.3, "tasa_mutacion": 0.7},
+]
 
-genetico.ejecutar()
+def ejecutar_experimento(idx, config):
+    print(f"\nEjecutando Experimento {idx+1}")
+    genetico = AlgoritmoGenetico(
+        poblacion_size=config["poblacion_size"],
+        cromosoma_size=config["cromosoma_size"],
+        tasa_cruce=config["tasa_cruce"],
+        tasa_mutacion=config["tasa_mutacion"],
+        num_generaciones=10,
+        operador_seleccion=Seleccion.torneo,
+        operador_cruce=Cruce.un_punto,
+        operador_mutacion=Mutacion.scramble,
+        tamano_elite=0.1,
+        maximize=True,
+        tolerancia_generaciones=10
+    )
+    genetico.ejecutar()
+    nombre_archivo = f"resultado_experimento_{idx+1}.csv"
+    genetico.generar_dataset(nombre_archivo)
+    genetico.mostrar_estadisticas_finales()
+    genetico.plot_fitness_evolution()
+    genetico.plot_boxplot_fitness()
+    print(f"Experimento {idx+1} finalizado y guardado en {nombre_archivo}")
 
-genetico.mostrar_estadisticas_finales()
-genetico.generar_dataset("resultado_algoritmo_genetico.csv")
-genetico.plot_fitness_evolution()
-genetico.plot_boxplot_fitness()
+# Ejecutar los experimentos en paralelo
+if __name__ == "__main__":
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        futures = [executor.submit(ejecutar_experimento, idx, config) for idx, config in enumerate(experimentos)]
+        concurrent.futures.wait(futures)  # Espera hasta que todos los experimentos hayan terminado

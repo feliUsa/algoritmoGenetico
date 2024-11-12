@@ -4,10 +4,8 @@ from numba import njit
 class Seleccion:
     @staticmethod
     def torneo(poblacion, k=3):
-        # Extrae los valores de fitness en una lista
-        fitness_values = np.array([ind.fitness for ind in poblacion.individuos])
+        fitness_values = np.array([ind.fitness for ind in poblacion.individuos], dtype=np.float64)
         seleccionados_indices = torneo_seleccion(fitness_values, k)
-        # Mapear los índices seleccionados a los individuos originales
         return [poblacion.individuos[i] for i in seleccionados_indices]
 
 @njit

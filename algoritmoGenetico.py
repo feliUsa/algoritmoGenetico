@@ -1,90 +1,93 @@
 import numpy as np
-import matplotlib.pyplot as plt
-import pandas as pd
-from Poblacion import Poblacion
-from Elitismo import Elitismo
-from fitness import fitness_func
 import time
+import matplotlib.pyplot as plt
+from operadoresGeneticos import aplicar_seleccion, aplicar_cruce, aplicar_mutacion, aplicar_elitismo, aplicar_fitness
 
 class AlgoritmoGenetico:
-    def __init__(self, poblacion_size, cromosoma_size, tasa_cruce, tasa_mutacion, num_generaciones,
-                 operador_seleccion, operador_cruce, operador_mutacion, tamano_elite=0.1, maximize=True, tolerancia_generaciones=10):
-        self.poblacion = Poblacion(poblacion_size, cromosoma_size, lambda cromosoma: fitness_func(cromosoma, maximize))
+    def __init__(self, poblacion_size, cromosoma_size, tasa_cruce, tasa_mutacion, num_generaciones, tamano_elite=0.1, maximize=True, tolerancia_generaciones=10):
+        self.poblacion_size = poblacion_size
+        self.cromosoma_size = cromosoma_size
         self.tasa_cruce = tasa_cruce
         self.tasa_mutacion = tasa_mutacion
         self.num_generaciones = num_generaciones
-        self.operador_seleccion = operador_seleccion
-        self.operador_cruce = operador_cruce
-        self.operador_mutacion = operador_mutacion
-        self.tamano_elite = tamano_elite
+        self.tamano_elite = int(tamano_elite * poblacion_size)
         self.maximize = maximize
         self.tolerancia_generaciones = tolerancia_generaciones
 
-        # Variables para almacenar datos de fitness
+        # Inicializar población como matriz
+        self.poblacion = np.random.choice([0, 1], size=(poblacion_size, cromosoma_size), p=[0.9, 0.1]).astype(np.bool_)
+        self.fitness_values = np.array([aplicar_fitness(cromosoma, maximize) for cromosoma in self.poblacion])
+
+        # Variables para almacenar datos de fitness a lo largo de las generaciones
         self.fitness_promedio = []
         self.fitness_max = []
         self.fitness_min = []
-        self.fitness_por_generacion = []
-        self.dataset = []
+        self.varianza_fitness = []
         self.tiempo_acumulado = 0
 
     def ejecutar(self):
-        self.poblacion.calcular_fitness()
         generaciones_estables = 0
         tiempo_inicio_total = time.time()
 
         for gen in range(self.num_generaciones):
             tiempo_inicio = time.time()
-            print(f"Generacion {gen}")
-            num_elite = max(1, int(len(self.poblacion.individuos) * self.tamano_elite))
 
-            # Mantener los individuos élite
-            elite = Elitismo.aplicar(self.poblacion, num_elite)
-            nueva_poblacion = elite.copy()  # Empezamos la nueva población con los élite
+            # Elitismo
+            elite, elite_fitness = aplicar_elitismo(self.poblacion, self.fitness_values, self.tamano_elite)
 
-            # Seleccionar individuos para cruce y mutación
-            seleccionados = self.operador_seleccion(self.poblacion)
+            # Selección
+            seleccion_indices = aplicar_seleccion(self.fitness_values)
+            seleccionados = self.poblacion[seleccion_indices]
 
-            # Cruce
-            for i in range(0, len(seleccionados) - 1, 2):
-                if np.random.rand() < self.tasa_cruce:
-                    hijo1, hijo2 = self.operador_cruce(seleccionados[i], seleccionados[i+1])
-                    hijo1.calcular_fitness(self.poblacion.fitness_func)  # Calcular fitness de los hijos directamente
-                    hijo2.calcular_fitness(self.poblacion.fitness_func)
-                    nueva_poblacion.extend([hijo1, hijo2])
+            # Cruce y creación de nueva población
+            nueva_poblacion = np.empty_like(self.poblacion)
+            nueva_poblacion[:self.tamano_elite] = elite  # Mantener los élites
+            nueva_fitness_values = np.empty(self.poblacion_size)
+            nueva_fitness_values[:self.tamano_elite] = elite_fitness
+
+            for i in range(self.tamano_elite, self.poblacion_size, 2):
+                if np.random.rand() < self.tasa_cruce and i + 1 < self.poblacion_size:
+                    hijo1, hijo2 = aplicar_cruce(seleccionados[i - self.tamano_elite], seleccionados[i + 1 - self.tamano_elite])
+                    nueva_poblacion[i] = hijo1
+                    nueva_poblacion[i + 1] = hijo2
+                    nueva_fitness_values[i] = aplicar_fitness(hijo1, self.maximize)
+                    nueva_fitness_values[i + 1] = aplicar_fitness(hijo2, self.maximize)
                 else:
-                    nueva_poblacion.extend([seleccionados[i], seleccionados[i+1]])
+                    nueva_poblacion[i] = seleccionados[i - self.tamano_elite]
+                    nueva_poblacion[i + 1] = seleccionados[i + 1 - self.tamano_elite]
+                    nueva_fitness_values[i] = self.fitness_values[seleccion_indices[i - self.tamano_elite]]
+                    nueva_fitness_values[i + 1] = self.fitness_values[seleccion_indices[i + 1 - self.tamano_elite]]
 
-            # Mutación solo en individuos nuevos, excluyendo a los élite
-            for individuo in nueva_poblacion[num_elite:]:
-                if np.random.rand() < self.tasa_mutacion:
-                    self.operador_mutacion(individuo)
-                    individuo.calcular_fitness(self.poblacion.fitness_func)  # Recalcular fitness solo si fue mutado
+            # Mutación
+            for i in range(self.tamano_elite, self.poblacion_size):
+                nueva_poblacion[i] = aplicar_mutacion(nueva_poblacion[i], self.tasa_mutacion)
+                nueva_fitness_values[i] = aplicar_fitness(nueva_poblacion[i], self.maximize)
 
-            # Actualizar la población con los individuos nuevos
-            self.poblacion.individuos = nueva_poblacion[:len(self.poblacion.individuos)]
-            
-            # Almacenamiento de estadísticas en cada generación
-            estadisticas = self.poblacion.obtener_estadisticas_fitness()
-            self.fitness_promedio.append(estadisticas['promedio'])
-            self.fitness_max.append(estadisticas['max'])
-            self.fitness_min.append(estadisticas['min'])
-            self.fitness_por_generacion.append([ind.fitness for ind in self.poblacion.individuos])
-            
-            # Guardar datos de cada individuo en el dataset para el reporte
-            for individuo in self.poblacion.individuos:
-                self.dataset.append({
-                    'generacion': gen,
-                    'fitness': individuo.fitness,
-                    'fitness_promedio': estadisticas['promedio'],
-                    'fitness_max': estadisticas['max'],
-                    'fitness_min': estadisticas['min'],
-                    'fitness_varianza': estadisticas['varianza'],
-                    'tiempo (ms)': self.tiempo_acumulado
-                })
+            # Actualizar población y fitness
+            self.poblacion = nueva_poblacion
+            self.fitness_values = nueva_fitness_values
 
+            # Estadísticas de fitness
+            promedio_fitness = np.mean(self.fitness_values)
+            max_fitness = np.max(self.fitness_values)
+            min_fitness = np.min(self.fitness_values)
+            varianza_fitness = np.var(self.fitness_values)
+
+            self.fitness_promedio.append(promedio_fitness)
+            self.fitness_max.append(max_fitness)
+            self.fitness_min.append(min_fitness)
+            self.varianza_fitness.append(varianza_fitness)
+
+            # Tiempo acumulado
             tiempo_fin = time.time()
-            self.tiempo_acumulado += (tiempo_fin - tiempo_inicio) * 1000
+            self.tiempo_acumulado += tiempo_fin - tiempo_inicio
+
+            # Imprimir resultados de la generación
+            print(f"Generación: {gen + 1} de {self.num_generaciones}")
+            print(f"Fitness promedio: {promedio_fitness}")
+            print(f"Fitness máximo: {max_fitness}")
+            print(f"Fitness mínimo: {min_fitness}")
+            print(f"Tiempo de ejecución: {self.tiempo_acumulado:.2f} s\n")
 
             # Verificación de estabilidad del fitness
             if len(self.fitness_max) > 1 and self.fitness_max[-1] == self.fitness_max[-2]:
@@ -95,36 +98,29 @@ class AlgoritmoGenetico:
             if generaciones_estables >= self.tolerancia_generaciones:
                 print(f"\nFitness estabilizado durante {self.tolerancia_generaciones} generaciones consecutivas. Deteniendo la ejecución.")
                 break
-        
-        tiempo_total = (time.time() - tiempo_inicio_total) * 1000
-        print(f"\nTiempo total de ejecución: {tiempo_total} ms")
 
-    def generar_dataset(self, nombre_archivo="resultado_algoritmo_genetico.csv"):
-        df = pd.DataFrame(self.dataset)
-        df.to_csv(nombre_archivo, index=False)
-        print(f"Dataset guardado como {nombre_archivo}")
+        # Tiempo total
+        tiempo_total = time.time() - tiempo_inicio_total
+        print(f"Tiempo total de ejecución: {tiempo_total:.2f} s")
 
     def mostrar_estadisticas_finales(self):
-        print("\nEstadísticas Finales:")
-        print(f"Fitness Promedio: {self.fitness_promedio[-1]}")
-        print(f"Fitness Máximo: {self.fitness_max[-1]}")
-        print(f"Fitness Mínimo: {self.fitness_min[-1]}")
+        """Mostrar las estadísticas de fitness y graficar su evolución a lo largo de las generaciones."""
+        
+        # Imprimir estadísticas finales
+        print("\nEstadísticas finales de la ejecución:")
+        print(f"Fitness máximo en todas las generaciones: {max(self.fitness_max)}")
+        print(f"Fitness mínimo en todas las generaciones: {min(self.fitness_min)}")
+        print(f"Fitness promedio en todas las generaciones: {np.mean(self.fitness_promedio)}")
+        print(f"Varianza de fitness en todas las generaciones: {np.mean(self.varianza_fitness)}")
 
-    def plot_fitness_evolution(self):
-        plt.figure(figsize=(10, 5))
-        plt.plot(self.fitness_promedio, label='Promedio')
-        plt.plot(self.fitness_max, label='Máximo')
-        plt.plot(self.fitness_min, label='Mínimo')
-        plt.xlabel('Generación')
-        plt.ylabel('Fitness')
+        # Graficar la evolución del fitness
+        plt.figure(figsize=(10, 6))
+        plt.plot(self.fitness_promedio, label="Fitness Promedio", color='blue')
+        plt.plot(self.fitness_max, label="Fitness Máximo", color='green')
+        plt.plot(self.fitness_min, label="Fitness Mínimo", color='red')
+        plt.fill_between(range(len(self.fitness_promedio)), self.fitness_min, self.fitness_max, color='gray', alpha=0.2)
+        plt.xlabel("Generación")
+        plt.ylabel("Fitness")
+        plt.title("Evolución del Fitness a lo largo de las generaciones")
         plt.legend()
-        plt.title('Evolución del Fitness')
-        plt.show()
-
-    def plot_boxplot_fitness(self):
-        plt.figure(figsize=(10, 5))
-        plt.boxplot(self.fitness_por_generacion, showmeans=True)
-        plt.xlabel('Generación')
-        plt.ylabel('Fitness')
-        plt.title('Diagrama de Cajas del Fitness por Generación')
         plt.show()

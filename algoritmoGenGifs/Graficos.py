@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
+import matplotlib.animation as animation
 
 class graficos:
     def __init__(self):
@@ -57,5 +58,56 @@ class graficos:
             loop=2
         )
         print(f"GIF guardado como {nombre_archivo}")
+        
+        
+    def crear_gif_imagen(frames, interval=200, imageName="imagen.png",n_frames_to_save=15):
+        fig, ax = plt.subplots()
+        ims = []
+        
+        # Selecciona solo algunos frames
+        selected_frames = frames[::n_frames_to_save]
+        
+        for frame in selected_frames:
+            im = ax.imshow(frame, cmap='gray', animated=True)
+            ims.append([im])
+            
+        ani = animation.ArtistAnimation(fig, ims, interval=interval, blit=True)
+        ani.save(imageName, writer="imagemagick")
+
+        
+    
+    def escalaGrisesConvert(self, image):
+        # Convert image to grayscale
+        image = image.convert('L')
+        # Binarize the image (convert to black and white)
+        threshold = 128  # Adjust this value as needed
+        image = image.point(lambda p: p > threshold and 1 or 0)
+
+        # Display the binarized image
+        plt.figure()
+        plt.imshow(image, cmap='gray')
+        plt.axis('off')
+        plt.show()
+
+        # Convert the image to a NumPy array
+        image_array = np.array(image)
+        print(image_array.shape)
+        return image_array
+    
+    
+    def leerImagen(self, rutaImg):
+        image = Image.open(rutaImg)
+        print(image.size)
+        image = image.resize((150, 150))  # Ajusta el tamaño según lo necesites
+        # Display the image (optional)
+        plt.figure()
+        plt.imshow(image)
+        plt.axis('off') # Hide axes
+        plt.show()
+
+        # Convert the image to a NumPy array (if needed)
+        image_array = np.array(image)
+        return image_array, image
+
 
 

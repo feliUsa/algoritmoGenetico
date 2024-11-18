@@ -60,7 +60,7 @@ class graficos:
         print(f"GIF guardado como {nombre_archivo}")
         
         
-    def crear_gif_imagen(frames, interval=200, imageName="imagen.png",n_frames_to_save=15):
+    def crear_gif_imagen(self, frames, interval=200, imageName="imagen.gif",n_frames_to_save=15):
         fig, ax = plt.subplots()
         ims = []
         

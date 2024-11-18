@@ -23,4 +23,4 @@ genetic = AlgoritmoGenetico(
 
 
 genetic.ejecutar_con_gif(stats, frames, vector_objetivo, imagenArreglada.shape)
-stats.crear_gif_imagen(frames, interval=200, imageName="firma.png", n_frames_to_save=500)
+stats.crear_gif_imagen(frames, interval=200, imageName="firma.gif", n_frames_to_save=500)

@@ -1,3 +1,5 @@
+# AlgoritmoGenetico.py
+
 import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
@@ -5,13 +7,13 @@ from numba import njit
 
 # Clase del Algoritmo Genético
 class AlgoritmoGenetico:
-    def __init__(self, tam_poblacion, prob_mutacion, prob_cruce, tasa_elitismo, tam_cromosoma, fitness_objetivo):
+    def __init__(self, tam_poblacion, prob_mutacion, prob_cruce, tasa_elitismo, tam_cromosoma, objetivo):
         self.tam_poblacion = tam_poblacion
         self.prob_mutacion = prob_mutacion
         self.prob_cruce = prob_cruce
         self.tasa_elitismo = tasa_elitismo
         self.tam_cromosoma = tam_cromosoma
-        self.fitness_objetivo = fitness_objetivo
+        self.objetivo = objetivo
         self.poblacion = self._inicializar_poblacion()
         self.valores_fitness = np.zeros(self.tam_poblacion)
         self.generacion = 0
@@ -20,14 +22,15 @@ class AlgoritmoGenetico:
         """Crea la población inicial con valores binarios aleatorios."""
         return np.random.randint(2, size=(self.tam_poblacion, self.tam_cromosoma))
 
-    def _calcular_fitness(self, individuo, objetivo):
-        """Calcula el fitness como la distancia inversa de Hamming."""
-        return self.tam_cromosoma - np.sum(individuo != objetivo)
+    def _calcular_fitness(self, individuo):
+        """Calcula el fitness como la proporción de bits coincidentes con la matriz objetivo."""
+        coincidencias = np.sum(individuo == self.objetivo)  # Número de bits iguales
+        return coincidencias / self.tam_cromosoma  # Proporción de coincidencias
 
-    def evaluar_poblacion(self, objetivo):
+    def evaluar_poblacion(self):
         """Calcula el fitness de cada individuo en la población."""
         for i in range(self.tam_poblacion):
-            self.valores_fitness[i] = self._calcular_fitness(self.poblacion[i], objetivo)
+            self.valores_fitness[i] = self._calcular_fitness(self.poblacion[i])
 
     @staticmethod
     @njit
@@ -66,58 +69,24 @@ class AlgoritmoGenetico:
         indices_elite = np.argsort(fitness)[-num_elite:]
         return poblacion[indices_elite]
 
-    def ejecutar(self, estadisticas, target_array):
-        """Corre el algoritmo sin generación de GIF."""
-        sin_mejora = 0
-        generaciones_max_estancadas = 50
-        mejor_fitness_anterior = 0
 
-        while True:
-            self.evaluar_poblacion(target_array)
-            estadisticas.registrar(self.valores_fitness)
-
-            # Selección
-            padres_indices = self.seleccion_torneo(self.valores_fitness)
-            nueva_poblacion = []
-            for i in range(0, self.tam_poblacion, 2):
-                padre1, padre2 = self.poblacion[padres_indices[i]], self.poblacion[padres_indices[i + 1]]
-                if np.random.rand() < self.prob_cruce:
-                    hijo1, hijo2 = self.cruce_punto_unico(padre1, padre2)
-                else:
-                    hijo1, hijo2 = padre1, padre2
-                nueva_poblacion.extend([hijo1, hijo2])
-
-            # Mutación
-            nueva_poblacion = np.array([self.mutacion_scramble(ind, self.prob_mutacion) for ind in nueva_poblacion])
-
-            # Elitismo
-            elite = self.aplicar_elitismo(self.poblacion, self.valores_fitness, self.tasa_elitismo)
-            self.poblacion = np.vstack((elite, nueva_poblacion[:self.tam_poblacion - len(elite)]))
-
-            # Evaluar nueva población
-            mejor_fitness = np.max(self.valores_fitness)
-            if mejor_fitness == self.fitness_objetivo:
-                print(f"¡Objetivo alcanzado en la generación {self.generacion}!")
-                break
-
-            if mejor_fitness == mejor_fitness_anterior:
-                sin_mejora += 1
-            else:
-                sin_mejora = 0
-            mejor_fitness_anterior = mejor_fitness
-
-            if sin_mejora >= generaciones_max_estancadas:
-                print("Estancamiento detectado. Deteniendo el algoritmo.")
-                break
-
-            self.generacion += 1
-
-    def ejecutar_con_gif(self, estadisticas, frames, objetivo, tamano_imagen):
+    def ejecutar_con_gif(self, estadisticas, tamano_imagen, intervalo_guardado=10, max_generaciones =1000, directorio_guardado="imagenes", nombre_base="gen"):
         """Corre el algoritmo con generación de GIF."""
-        while True:
-            self.evaluar_poblacion(objetivo)
+        
+        import os
+        os.makedirs(directorio_guardado, exist_ok=True)  # Crear el directorio si no existe
+        
+        while self.generacion < max_generaciones:
+            self.evaluar_poblacion()  # No requiere pasar la matriz objetivo
             estadisticas.registrar(self.valores_fitness)
+            mejor_fitness = np.max(self.valores_fitness)
+            print(f"Generación {self.generacion}: Mejor Fitness = {mejor_fitness}")
 
+            if mejor_fitness >= 0.99:  # Umbral de parada opcional
+                print("Condición de parada alcanzada.")
+                break
+
+            # Seleccionar la pipol
             padres_indices = self.seleccion_torneo(self.valores_fitness)
             nueva_poblacion = []
             for i in range(0, self.tam_poblacion, 2):
@@ -128,15 +97,16 @@ class AlgoritmoGenetico:
                     hijo1, hijo2 = padre1, padre2
                 nueva_poblacion.extend([hijo1, hijo2])
 
+            # Mutar la pipol
             nueva_poblacion = np.array([self.mutacion_scramble(ind, self.prob_mutacion) for ind in nueva_poblacion])
+
+            # Elitisar la pipol
             elite = self.aplicar_elitismo(self.poblacion, self.valores_fitness, self.tasa_elitismo)
             self.poblacion = np.vstack((elite, nueva_poblacion[:self.tam_poblacion - len(elite)]))
 
-            mejor_individuo = self.poblacion[np.argmax(self.valores_fitness)]
-            frames.append(mejor_individuo.reshape(tamano_imagen))
-
-            if np.max(self.valores_fitness) == self.fitness_objetivo or self.generacion >= 7000:
-                print(f"Generación {self.generacion}: Fin del proceso.")
-                break
+            # Guardar la imagen si es generación divisible por el intervalo
+            if self.generacion % intervalo_guardado == 0:
+                mejor_individuo = self.poblacion[np.argmax(self.valores_fitness)]
+                estadisticas.guardar_imagen_individuo(mejor_individuo, tamano_imagen, self.generacion, directorio_guardado, nombre_base)
 
             self.generacion += 1

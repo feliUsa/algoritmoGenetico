@@ -1,3 +1,5 @@
+# Graficos.py
+
 import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
@@ -76,38 +78,54 @@ class graficos:
 
         
     
-    def escalaGrisesConvert(self, image):
-        # Convert image to grayscale
+    def leer_y_transformar_imagen(self, ruta_img, threshold=128):
+        """
+        Lee una imagen desde una ruta, la convierte a blanco y negro, y la retorna como un vector unidimensional.
+
+        Args:
+            ruta_img (str): Ruta de la imagen a procesar.
+            threshold (int): Umbral para binarizar la imagen (0-255).
+
+        Returns:
+            np.ndarray: Imagen binarizada en una sola dimensión.
+            tuple: Dimensiones originales de la imagen (alto, ancho).
+        """
+        # Leer la imagen desde la ruta
+        image = Image.open(ruta_img)
+        print(f"Tamaño original de la imagen: {image.size}")
+
+        # Convertir a escala de grises
         image = image.convert('L')
-        # Binarize the image (convert to black and white)
-        threshold = 128  # Adjust this value as needed
+
+        # Binarizar la imagen
         image = image.point(lambda p: p > threshold and 1 or 0)
 
-        # Display the binarized image
-        plt.figure()
-        plt.imshow(image, cmap='gray')
-        plt.axis('off')
-        plt.show()
-
-        # Convert the image to a NumPy array
+        # Convertir a un arreglo de NumPy
         image_array = np.array(image)
-        print(image_array.shape)
-        return image_array
+        print(f"Dimensiones de la imagen binarizada: {image_array.shape}")
+
+        # Retornar la imagen como un vector unidimensional y sus dimensiones originales
+        return image_array.flatten(), image_array.shape
     
-    
-    def leerImagen(self, rutaImg):
-        image = Image.open(rutaImg)
-        print(image.size)
-        image = image.resize((150, 150))  # Ajusta el tamaño según lo necesites
-        # Display the image (optional)
-        plt.figure()
-        plt.imshow(image)
-        plt.axis('off') # Hide axes
-        plt.show()
-
-        # Convert the image to a NumPy array (if needed)
-        image_array = np.array(image)
-        return image_array, image
-
-
-
+    def guardar_imagen_individuo(self, individuo, tamano_imagen, generacion, directorio=".", nombre_base="gen"):
+        """
+        Guarda una representación de la imagen generada a partir del mejor individuo.
+        
+        Args:
+            individuo (numpy.ndarray): Cromosoma del mejor individuo.
+            tamano_imagen (tuple): Dimensiones originales de la imagen.
+            generacion (int): Número de la generación actual.
+            directorio (str): Directorio donde se guardarán las imágenes.
+            nombre_base (str): Nombre base para los archivos.
+        """
+        # Convertir el cromosoma a su forma de imagen
+        imagen = individuo.reshape(tamano_imagen)
+        
+        # Normalizar valores si es necesario (0 o 1 -> 0 a 255)
+        imagen = (imagen * 255).astype(np.uint8)
+        
+        # Crear y guardar la imagen
+        imagen_pil = Image.fromarray(imagen)
+        nombre_archivo = f"{directorio}/{nombre_base}_gen{generacion}.png"
+        imagen_pil.save(nombre_archivo)
+        print(f"Imagen guardada: {nombre_archivo}")
